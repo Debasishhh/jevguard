@@ -110,59 +110,66 @@ ground: send those to human review instead of guessing.
 ## Benchmark
 
 Compared against a regex/keyword baseline and a GPT-4-class LLM judge
-(`openai/gpt-4o-mini` via OpenRouter), on 60 jailbreak prompts + 60 benign
+(`openai/gpt-4o-mini` via OpenRouter), on 200 jailbreak prompts + 200 benign
 prompts sampled from [verazuo/jailbreak_llms](https://github.com/verazuo/jailbreak_llms)
 (the in-the-wild jailbreak prompt dataset from the CCS'24 "Do Anything Now" paper).
 
 | Detector | Catch rate | False positive rate | Avg latency | Cost / 1k requests |
 |---|---|---|---|---|
-| regex baseline | 23% | 7% | 0 ms | $0.0000 |
-| **jevguard (Jev)** | 85% | **3.3%** | 1156 ms | **$0.0651** |
-| LLM judge (gpt-4o-mini) | 88% | 10.0% | 1187 ms | $0.0751 |
+| regex baseline | 24% | 8% | 0 ms | $0.0000 |
+| **jevguard (Jev)** | 83% | **16%** | 1097 ms | **$0.0653** |
+| LLM judge (gpt-4o-mini) | 84% | 19% | 1238 ms | $0.0760 |
 
 ![benchmark chart](benchmark/results_chart.png)
 
-**Reading this honestly:** jevguard nearly matches the LLM judge's catch rate
-(85% vs 88%) with **3x fewer false positives** (3.3% vs 10%), at lower cost
-and the same latency. The regex baseline is fast and free but catches barely
-a quarter of jailbreaks — it's the thing teams ship first and then have to
-replace.
+**Reading this honestly:** jevguard ties the LLM judge on catch rate (83% vs
+84%) with a lower false-positive rate (16% vs 19%), at lower cost and lower
+latency. The regex baseline is fast and free but catches barely a quarter of
+jailbreaks — it's the thing teams ship first and then have to replace.
 
-That false-positive gap wasn't free — it took two rounds of iteration to get
-there, and it's the more interesting part of the project than the final
-number:
+Getting here took three rounds of iteration, and the third one is the most
+important lesson in this repo:
 
-1. **First pass** (broad Noul questions, no examples): 90% catch / 13% FP.
-   Inspecting the actual false positives showed all six were "Please ignore
-   all previous instructions, act as a marketing expert / tutor / persona"
-   templates — completely benign prompt-engineering idioms that just happen
-   to contain literal instruction-override phrasing. `prompt_injection` was
-   technically answering the question asked ("does this override
-   instructions?") correctly; the question itself didn't distinguish intent.
+1. **First pass** (broad Noul questions, no examples), n=60/class: 90% catch
+   / 13% FP. All six false positives were "Please ignore all previous
+   instructions, act as a marketing expert / tutor / persona" templates —
+   benign prompt-engineering idioms that happen to contain literal
+   instruction-override phrasing.
 2. **Fix**: rewrote `jailbreak_attempt` and `prompt_injection` with explicit
    `criteria.true`/`criteria.false` examples contrasting "become unrestricted
    to get unsafe output" against "reset context for an ordinary task" (see
-   `jevguard/guard.py`). Re-ran: 85%/3.3%. One point of catch rate for a 3x
-   drop in false positives.
-3. Thresholds were then swept offline against the fixed signals
-   (`python -m benchmark.tune_thresholds`, no extra API calls per trial) to
-   land on the values in `guard.py`.
+   `jevguard/guard.py`). Re-ran at n=60/class: **85% catch / 3.3% FP.** Looked
+   like a clean win — one point of catch rate for a 3x drop in false
+   positives.
+3. **Then I ran it again at n=200/class**, 4x the sample, and the false
+   positive rate jumped to 16% — and the LLM judge's FP rate *also* jumped,
+   from 10% to 19%, on the same larger sample. The n=60 result wasn't wrong,
+   it was just too small to trust: 60 benign prompts happened to undersample
+   the genuinely ambiguous "reset persona" templates that make up a real
+   chunk of this dataset. A follow-up threshold sweep at n=200 found no
+   combination that meaningfully improves on 83%/16% — this residual
+   false-positive rate looks structural to the dataset's ambiguity, shared by
+   the LLM judge too, not a knob left untuned.
 
-The lesson (straight from [TypeSafe's own docs](https://docs.typesafe.ai/primitives/score)):
-ambiguous Noul/Score boundaries are usually a question-design problem, not a
-model ceiling — add contrastive examples before reaching for a bigger model
-or a different threshold.
+The lesson: fixing the question design (step 2) was a real, reproducible
+improvement — sharper Noul criteria with contrastive examples is a
+documented [TypeSafe pattern](https://docs.typesafe.ai/primitives/score) and
+it held up at 4x the sample size. Trusting a threshold number from 60 samples
+per class (step 3) was not — always re-check a benchmark on a bigger sample
+before writing the number down anywhere.
 
 Reproduce:
 ```bash
-python -m benchmark.run_benchmark --n-per-class 60
+python -m benchmark.run_benchmark --n-per-class 200
 ```
 
 ## Limitations
 
 - Text-only, English-primary (inherited from Jev — see [TypeSafe docs](https://docs.typesafe.ai/concepts/state)).
-- Thresholds were tuned on ~120 samples from one dataset; re-tune on your own
-  traffic before trusting them in production (see `benchmark/tune_thresholds.py`).
+- Thresholds were tuned and validated on ~400 samples from one dataset; a
+  16% false-positive rate on ambiguous "reset persona" style prompts is real
+  and unresolved — re-tune on your own traffic before trusting these
+  thresholds in production (see `benchmark/tune_thresholds.py`).
 - `flag` is a real third state — route it to human review, don't silently
   treat it as either `allow` or `block`.
 - The benchmark above only measures single-turn prompts (no `history`); the

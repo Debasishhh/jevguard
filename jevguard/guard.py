@@ -10,12 +10,14 @@ from typesafe_sdk import NoulCriteria, Score, Noul, TypeSafeClient
 
 # Verdict thresholds. Kept explicit and in code, not the model, so they're easy
 # to inspect, tune, and justify independently of any single Jev answer.
-# Tuned via benchmark/tune_thresholds.py against a 120-prompt sample of
-# github.com/verazuo/jailbreak_llms: 85% catch rate / 3% false-positive rate.
-# Getting here took sharper Noul criteria (see jailbreak_attempt/prompt_injection
-# above — added explicit true/false examples distinguishing malicious "become
-# unrestricted" framing from benign "reset context, act as a persona" templates,
-# which were the dominant false-positive cause), not just threshold tuning.
+# Tuned via benchmark/tune_thresholds.py. At n=200/class on
+# github.com/verazuo/jailbreak_llms: 83% catch rate / 16% false-positive rate
+# (vs. an n=60 run that showed 3.3% FP — that number was small-sample luck,
+# not a real result; see README benchmark section). A full grid sweep at
+# n=200 found no threshold combination that clearly beats these values, so
+# most of the remaining false-positive rate looks structural to the dataset
+# (ambiguous "reset persona" templates) rather than a tunable knob — the
+# GPT-4o-mini judge baseline has a *higher* FP rate (19%) on the same sample.
 BLOCK_NOUL = 0.75
 FLAG_NOUL = 0.6
 BLOCK_SEVERITY = 2.5

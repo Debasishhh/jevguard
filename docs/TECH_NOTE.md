@@ -74,23 +74,33 @@ sequenceDiagram
     Guard-->>App: {verdict, signals, reasons, latency_ms}
 ```
 
-**Why five questions, not one.** An earlier, broader version asked one
-question per concept with plain descriptions. Benchmarked against 60
-jailbreak + 60 benign prompts from a public dataset (see Metrics), it caught
-90% of jailbreaks but flagged 13% of benign prompts as attacks. Looking at
-the actual false positives, every single one was a benign prompt-engineering
-template — things like *"Please ignore all previous instructions, act as a
-marketing expert and write ad copy."* That phrase is literally
-instruction-override language, so the model wasn't wrong to notice it — the
-question just didn't distinguish *intent*. I rewrote the two relevant
-questions (`jailbreak_attempt`, `prompt_injection`) with explicit paired
-examples of "malicious: wants to become unrestricted" vs. "benign: resetting
-context for an ordinary task," and re-ran the same benchmark: 85% catch rate,
-3.3% false positives — a 3x drop in false positives for one point of catch
-rate. That's a general lesson from TypeSafe's own docs I hadn't internalized
-until I hit it myself: an ambiguous yes/no boundary is usually a
-question-design problem, fixed with contrastive examples, not a reason to
-reach for a bigger model.
+**Why five questions, not one, and three rounds to get the numbers right.**
+An earlier, broader version asked one question per concept with plain
+descriptions. Benchmarked against 60 jailbreak + 60 benign prompts from a
+public dataset (see Metrics), it caught 90% of jailbreaks but flagged 13% of
+benign prompts as attacks. Looking at the actual false positives, every
+single one was a benign prompt-engineering template — things like *"Please
+ignore all previous instructions, act as a marketing expert and write ad
+copy."* That phrase is literally instruction-override language, so the model
+wasn't wrong to notice it — the question just didn't distinguish *intent*. I
+rewrote the two relevant questions (`jailbreak_attempt`, `prompt_injection`)
+with explicit paired examples of "malicious: wants to become unrestricted"
+vs. "benign: resetting context for an ordinary task," and re-ran the same
+60/class benchmark: 85% catch rate, 3.3% false positives.
+
+That looked like a clean win, so I re-ran it a third time at 200/class (4x
+the sample) before trusting it — and the false-positive rate jumped to 16%,
+with the GPT-4o-mini judge baseline's FP rate *also* jumping, from 10% to
+19%, on the same larger sample. The 60-sample number wasn't a mistake, it
+was just too small: it happened to undersample a genuinely ambiguous slice
+of the dataset. A threshold sweep at 200/class found nothing that beats
+83%/16% — this residual false-positive rate is shared by the LLM judge too,
+so it looks like real dataset ambiguity, not a knob I left untuned. The
+question-design fix (round two) held up under the bigger sample; the
+threshold number from round two (3.3%) did not. Lesson: sharper Noul
+criteria with contrastive examples is a real, reproducible fix — a small
+benchmark's exact number is not something to trust until re-checked on a
+bigger one.
 
 **Multi-turn history.** A jailbreak doesn't have to appear in one message —
 it can be built up over several individually-benign turns. I added a fifth
@@ -133,24 +143,27 @@ and the verdict it produces.
 - CI: GitHub Actions runs the unit test suite (pure threshold logic, no
   network) on every push.
 
-### Metrics — the benchmark, on 60 jailbreak + 60 benign prompts from
+### Metrics — the benchmark, on 200 jailbreak + 200 benign prompts from
 [verazuo/jailbreak_llms](https://github.com/verazuo/jailbreak_llms) (public,
 real in-the-wild jailbreak prompts, not synthetic):
 
 | Detector | Catch rate | False positive rate | Latency | Cost / 1k requests |
 |---|---|---|---|---|
-| regex baseline | 23% | 7% | 0 ms | $0.0000 |
-| **jevguard (Jev)** | 85% | **3.3%** | 1156 ms | **$0.065** |
-| LLM judge (gpt-4o-mini) | 88% | 10.0% | 1187 ms | $0.075 |
+| regex baseline | 24% | 8% | 0 ms | $0.0000 |
+| **jevguard (Jev)** | 83% | **16%** | 1097 ms | **$0.065** |
+| LLM judge (gpt-4o-mini) | 84% | 19% | 1238 ms | $0.076 |
 
-jevguard nearly matches the GPT-4-class judge's catch rate with a third of
-its false-positive rate, at lower cost and the same latency. Not the "100x
-cheaper" headline Jev's raw per-token price would suggest on its own — a
-5-question call sends more input tokens than a single-question judge prompt
-— but a real, measured win on the metric that actually matters for a
-guardrail (false positives are what erode user trust and generate support
-tickets).
+jevguard ties the GPT-4-class judge's catch rate with a lower false-positive
+rate, at lower cost and latency. Not the "100x cheaper" headline Jev's raw
+per-token price would suggest on its own — a 5-question call sends more
+input tokens than a single-question judge prompt — but a real, measured win
+on the metric that matters most for a guardrail (false positives are what
+erode user trust and generate support tickets). The 16%/19% false-positive
+rates are higher than an earlier 60-sample run suggested (3.3%/10%) — that
+smaller run undersampled the dataset's genuinely ambiguous "reset persona"
+templates; see the Architecture section for the full story. Re-running this
+exact benchmark once at 4x the sample size, and finding the earlier number
+didn't hold, is itself the most useful thing this project taught me about
+trusting small benchmarks.
 
-Not yet tracked: a labeled multi-turn dataset for `gradual_escalation`, and
-threshold re-validation on a larger sample (current n=60/class is enough to
-be directionally right, not enough for tight confidence intervals).
+Not yet tracked: a labeled multi-turn dataset for `gradual_escalation`.

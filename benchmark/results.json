@@ -1,26 +1,26 @@
 [
   {
     "name": "regex baseline",
-    "catch_rate": 0.23333333333333334,
-    "false_positive_rate": 0.06666666666666667,
-    "avg_latency_ms": 0.07652467538719065,
+    "catch_rate": 0.24,
+    "false_positive_rate": 0.075,
+    "avg_latency_ms": 0.07444671278790338,
     "cost_per_1k_usd": 0.0,
     "errors": 0
   },
   {
     "name": "jevguard (Jev)",
-    "catch_rate": 0.85,
-    "false_positive_rate": 0.03333333333333333,
-    "avg_latency_ms": 1156.3954924004065,
-    "cost_per_1k_usd": 0.06508320000000004,
+    "catch_rate": 0.83,
+    "false_positive_rate": 0.155,
+    "avg_latency_ms": 1097.437144520045,
+    "cost_per_1k_usd": 0.06530947499999999,
     "errors": 0
   },
   {
     "name": "LLM judge (openai/gpt-4o-mini)",
-    "catch_rate": 0.8833333333333333,
-    "false_positive_rate": 0.1,
-    "avg_latency_ms": 1187.2667662913348,
-    "cost_per_1k_usd": 0.07507249999999997,
+    "catch_rate": 0.84,
+    "false_positive_rate": 0.19,
+    "avg_latency_ms": 1237.512918745124,
+    "cost_per_1k_usd": 0.07596937499999998,
     "errors": 0
   }
 ]
