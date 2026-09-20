@@ -1,0 +1,25 @@
+[project]
+name = "jevguard"
+version = "0.1.0"
+description = "LLM guardrail firewall built on TypeSafe's Jev — screens prompts for jailbreaks, prompt injection, and secret extraction at a fraction of the cost of an LLM judge."
+requires-python = ">=3.10"
+dependencies = [
+    "typesafe-sdk",
+    "python-dotenv",
+]
+
+[project.optional-dependencies]
+benchmark = [
+    "requests",
+    "matplotlib",
+]
+dev = [
+    "pytest",
+]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["jevguard*"]
