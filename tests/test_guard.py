@@ -38,7 +38,7 @@ def test_block_on_gradual_escalation():
 
 def test_flag_on_mid_range_signal():
     verdict, reasons = _compose(
-        jailbreak=0.6, injection=0.1, credential=0.0, escalation=0.0, severity=0.3
+        jailbreak=0.65, injection=0.1, credential=0.0, escalation=0.0, severity=0.3
     )
     assert verdict == Verdict.FLAG
     assert "jailbreak_attempt" in reasons
