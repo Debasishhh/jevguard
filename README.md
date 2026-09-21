@@ -63,6 +63,7 @@ print(result.to_dict())
     "jailbreak_attempt": 0.99,
     "prompt_injection": 0.99,
     "credential_or_secret_request": 0.05,
+    "gradual_escalation": 0.02,
     "policy_violation_severity": 3.0,
     "severity_confidence": 1.0
   },
