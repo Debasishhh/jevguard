@@ -4,3 +4,4 @@ __pycache__/
 *.pyc
 *.egg-info/
 benchmark/data/
+.DS_Store
